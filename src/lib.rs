@@ -4,6 +4,7 @@ use nusb::{
 };
 use std::time::Duration;
 
+#[derive(Clone, Copy)]
 enum Mode {
     Button = 0x00,
     ChannelStrip = 0x64,
@@ -26,7 +27,7 @@ const MUTED: u32 = 0x00;
 const CHANNEL_UNITY: u32 = 0x0100_0000;
 
 pub struct Command {
-    pub mode: u32,
+    pub mode: Mode,
     pub input_strip: u32,
     pub output_bus: u32,
     pub output_channel: u32,
@@ -36,7 +37,7 @@ pub struct Command {
 impl Command {
     pub fn new() -> Self {
         Command {
-            mode: Mode::ChannelStrip as u32,
+            mode: Mode::ChannelStrip,
             input_strip: 0x00,
             output_bus: 0x04,
             output_channel: LEFT,
@@ -51,7 +52,7 @@ impl Command {
         let mut arr = [0u8; 28];
         let mut i = 0;
 
-        for b in self.mode.to_le_bytes() {
+        for b in (self.mode as u32).to_le_bytes() {
             arr[i] = b;
             i += 1;
         }
@@ -91,7 +92,7 @@ impl Command {
     pub fn set_button(&mut self, button: Button, value: bool) -> &Self {
         self.input_strip = 0x00;
         self.output_bus = 0x00;
-        self.mode = Mode::Button as u32;
+        self.mode = Mode::Button;
         self.output_channel = button as u32;
         self.value = match value {
             true => 1,
@@ -354,7 +355,7 @@ mod tests {
         let device = open_device();
         let mut command = Command::new();
         let mut state = State::new();
-        let pause = Duration::from_secs(1);
+        let pause = Duration::from_millis(500);
 
         command
             .set_button(Button::Line, true)
