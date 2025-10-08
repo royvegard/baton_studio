@@ -5,13 +5,14 @@ use nusb::{
 use std::time::Duration;
 
 #[derive(Clone, Copy)]
-enum Mode {
+pub enum Mode {
     Button = 0x00,
     ChannelStrip = 0x64,
     BusStrip = 0x65,
 }
 
-enum Button {
+#[derive(Clone, Copy)]
+pub enum Button {
     Line = 0x00,
     Mute = 0x01,
     Mono = 0x02,
@@ -19,8 +20,11 @@ enum Button {
 }
 
 // Output channels
-const LEFT: u32 = 0x00;
-const RIGHT: u32 = 0x01;
+#[derive(Clone, Copy)]
+pub enum Channel {
+    Left = 0x00,
+    Right = 0x01,
+}
 
 // Fader presets
 const MUTED: u32 = 0x00;
@@ -30,8 +34,13 @@ pub struct Command {
     pub mode: Mode,
     pub input_strip: u32,
     pub output_bus: u32,
-    pub output_channel: u32,
+    pub output_channel: Channel,
+    pub button: Button,
     pub value: u32,
+}
+
+pub fn db_to_gain(db: f64) -> u32 {
+    (CHANNEL_UNITY as f64 * 10.0_f64.powf(db.clamp(-120.0, 10.0) / 20.0)) as u32
 }
 
 impl Command {
@@ -40,7 +49,8 @@ impl Command {
             mode: Mode::ChannelStrip,
             input_strip: 0x00,
             output_bus: 0x04,
-            output_channel: LEFT,
+            output_channel: Channel::Left,
+            button: Button::Line,
             value: 0x00000000,
         }
     }
@@ -56,7 +66,12 @@ impl Command {
             arr[i] = b;
             i += 1;
         }
-        for b in self.input_strip.to_le_bytes() {
+        let value = match self.mode {
+            Mode::Button => 0x00,
+            Mode::ChannelStrip => self.input_strip,
+            Mode::BusStrip => self.output_bus,
+        };
+        for b in value.to_le_bytes() {
             arr[i] = b;
             i += 1;
         }
@@ -72,7 +87,12 @@ impl Command {
             arr[i] = b;
             i += 1;
         }
-        for b in self.output_channel.to_le_bytes() {
+        let value = match self.mode {
+            Mode::Button => self.button as u32,
+            Mode::ChannelStrip => self.output_channel as u32,
+            Mode::BusStrip => Channel::Left as u32,
+        };
+        for b in value.to_le_bytes() {
             arr[i] = b;
             i += 1;
         }
@@ -84,20 +104,37 @@ impl Command {
         arr
     }
 
-    pub fn set_db(&mut self, db: f64) -> &Self {
-        self.value = (CHANNEL_UNITY as f64 * 10.0_f64.powf(db.clamp(-96.0, 10.0) / 20.0)) as u32;
-        self
-    }
-
-    pub fn set_button(&mut self, button: Button, value: bool) -> &Self {
+    pub fn set_button(&mut self, button: Button, value: bool) -> &mut Self {
         self.input_strip = 0x00;
         self.output_bus = 0x00;
         self.mode = Mode::Button;
-        self.output_channel = button as u32;
+        self.button = button;
         self.value = match value {
             true => 1,
             false => 0,
         };
+        self
+    }
+
+    pub fn set_input_fader(
+        &mut self,
+        input: u32,
+        output: u32,
+        channel: Channel,
+        value: u32,
+    ) -> &mut Self {
+        self.mode = Mode::ChannelStrip;
+        self.input_strip = input;
+        self.output_bus = output;
+        self.output_channel = channel;
+        self.value = value;
+        self
+    }
+
+    pub fn set_output_fader(&mut self, output: u32, value: u32) -> &mut Self {
+        self.mode = Mode::BusStrip;
+        self.output_bus = output;
+        self.value = value;
         self
     }
 
@@ -417,5 +454,56 @@ mod tests {
             .unwrap();
         state.poll(&device).unwrap();
         assert_eq!(state.phantom, 0);
+    }
+
+    #[test]
+    fn fader() {
+        let device = open_device();
+        let mut command = Command::new();
+        let mut state = State::new();
+
+        // Mute all inputs
+        for c in 0..36 {
+            command
+                .set_input_fader(c, 0, Channel::Left, 0)
+                .send(&device)
+                .unwrap();
+            command
+                .set_input_fader(c, 0, Channel::Right, 0)
+                .send(&device)
+                .unwrap();
+        }
+
+        // Set Daw1 to unity gain
+        command
+            .set_input_fader(18, 0, Channel::Left, CHANNEL_UNITY)
+            .send(&device)
+            .unwrap();
+        command
+            .set_input_fader(18, 0, Channel::Right, CHANNEL_UNITY)
+            .send(&device)
+            .unwrap();
+        command
+            .set_output_fader(0, db_to_gain(0.0))
+            .send(&device)
+            .unwrap();
+
+        let pause = Duration::from_millis(123);
+        let samples = 10;
+        let mut sum_out = 0.0;
+        let mut sum_in = 0.0;
+
+        for _ in 0..samples {
+            thread::sleep(pause);
+            state.poll(&device).unwrap();
+            sum_out += State::get_db(state.bus[0]);
+            sum_out += State::get_db(state.bus[1]);
+            sum_in += State::get_db(state.daw[0]);
+            sum_in += State::get_db(state.daw[1]);
+        }
+        let average_out = sum_out / (samples * 2) as f64;
+        let average_in = sum_in / (samples * 2) as f64;
+        println!("in:  {average_in}");
+        println!("out: {average_out}");
     }
 }
