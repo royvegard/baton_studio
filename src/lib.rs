@@ -28,7 +28,7 @@ pub struct Command {
     pub input_strip: u32,
     pub output_bus: u32,
     pub output_channel: u32,
-    pub value: u32,
+    value: u32,
 }
 
 impl Command {
@@ -81,11 +81,24 @@ impl Command {
         arr
     }
 
-    pub fn set_db(&mut self, db: f64) {
+    pub fn set_db(&mut self, db: f64) -> &Self {
         self.value = (CHANNEL_UNITY as f64 * 10.0_f64.powf(db.clamp(-96.0, 10.0) / 20.0)) as u32;
+        self
     }
 
-    pub fn send_command(&self, device: &Device) -> Result<(), TransferError> {
+    pub fn set_button(&mut self, button: u32, value: bool) -> &Self {
+        self.input_strip = 0x00;
+        self.output_bus = 0x00;
+        self.mode = MODE_BUTTON;
+        self.output_channel = button;
+        self.value = match value {
+            true => 1,
+            false => 0,
+        };
+        self
+    }
+
+    pub fn send(&self, device: &Device) -> Result<(), TransferError> {
         let fader_control: ControlOut = ControlOut {
             control_type: ControlType::Vendor,
             recipient: Recipient::Device,
@@ -335,28 +348,70 @@ mod tests {
     }
 
     #[test]
-    fn set_line_1_2_on_off() {
+    fn buttons() {
         let device = open_device();
         let mut command = Command::new();
         let mut state = State::new();
 
-        command.mode = MODE_BUTTON;
-        command.input_strip = 0x00;
-        command.output_bus = 0x00;
-        command.output_channel = BUTTON_1_2_LINE;
-        command.value = 1;
-        command.send_command(&device).unwrap();
-
+        command
+            .set_button(BUTTON_1_2_LINE, true)
+            .send(&device)
+            .unwrap();
         thread::sleep(Duration::from_secs(1));
         state.poll(&device).unwrap();
         assert_eq!(state.line, 1);
 
-        thread::sleep(Duration::from_secs(1));
-        command.value = 0;
-        command.send_command(&device).unwrap();
-
+        command
+            .set_button(BUTTON_1_2_LINE, false)
+            .send(&device)
+            .unwrap();
         thread::sleep(Duration::from_secs(1));
         state.poll(&device).unwrap();
         assert_eq!(state.line, 0);
+
+        command
+            .set_button(BUTTON_MAIN_MONO, true)
+            .send(&device)
+            .unwrap();
+        thread::sleep(Duration::from_secs(1));
+        state.poll(&device).unwrap();
+        assert_eq!(state.mono, 1);
+
+        command
+            .set_button(BUTTON_MAIN_MONO, false)
+            .send(&device)
+            .unwrap();
+        thread::sleep(Duration::from_secs(1));
+        state.poll(&device).unwrap();
+        assert_eq!(state.mono, 0);
+
+        command
+            .set_button(BUTTON_MAIN_MUTE, true)
+            .send(&device)
+            .unwrap();
+        thread::sleep(Duration::from_secs(1));
+        state.poll(&device).unwrap();
+        assert_eq!(state.mute, 1);
+        command
+            .set_button(BUTTON_MAIN_MUTE, false)
+            .send(&device)
+            .unwrap();
+        state.poll(&device).unwrap();
+        assert_eq!(state.mute, 0);
+
+        thread::sleep(Duration::from_secs(1));
+        command
+            .set_button(BUTTON_PHANTOM_POWER, true)
+            .send(&device)
+            .unwrap();
+        thread::sleep(Duration::from_secs(1));
+        state.poll(&device).unwrap();
+        assert_eq!(state.phantom, 1);
+        command
+            .set_button(BUTTON_PHANTOM_POWER, false)
+            .send(&device)
+            .unwrap();
+        state.poll(&device).unwrap();
+        assert_eq!(state.phantom, 0);
     }
 }
