@@ -9,11 +9,12 @@ const MODE_BUTTON: u32 = 0x00;
 const MODE_CHANNEL_STRIP: u32 = 0x64;
 const MODE_BUS_STRIP: u32 = 0x65;
 
-// Buttons
-const BUTTON_1_2_LINE: u32 = 0x00;
-const BUTTON_MAIN_MUTE: u32 = 0x01;
-const BUTTON_MAIN_MONO: u32 = 0x02;
-const BUTTON_PHANTOM_POWER: u32 = 0x04;
+enum Button {
+    Line = 0x00,
+    Mute = 0x01,
+    Mono = 0x02,
+    Phantom = 0x04,
+}
 
 // Output channels
 const LEFT: u32 = 0x00;
@@ -86,11 +87,11 @@ impl Command {
         self
     }
 
-    pub fn set_button(&mut self, button: u32, value: bool) -> &Self {
+    pub fn set_button(&mut self, button: Button, value: bool) -> &Self {
         self.input_strip = 0x00;
         self.output_bus = 0x00;
         self.mode = MODE_BUTTON;
-        self.output_channel = button;
+        self.output_channel = button as u32;
         self.value = match value {
             true => 1,
             false => 0,
@@ -352,63 +353,64 @@ mod tests {
         let device = open_device();
         let mut command = Command::new();
         let mut state = State::new();
+        let pause = Duration::from_secs(1);
 
         command
-            .set_button(BUTTON_1_2_LINE, true)
+            .set_button(Button::Line, true)
             .send(&device)
             .unwrap();
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(pause);
         state.poll(&device).unwrap();
         assert_eq!(state.line, 1);
 
         command
-            .set_button(BUTTON_1_2_LINE, false)
+            .set_button(Button::Line, false)
             .send(&device)
             .unwrap();
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(pause);
         state.poll(&device).unwrap();
         assert_eq!(state.line, 0);
 
         command
-            .set_button(BUTTON_MAIN_MONO, true)
+            .set_button(Button::Mono, true)
             .send(&device)
             .unwrap();
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(pause);
         state.poll(&device).unwrap();
         assert_eq!(state.mono, 1);
 
         command
-            .set_button(BUTTON_MAIN_MONO, false)
+            .set_button(Button::Mono, false)
             .send(&device)
             .unwrap();
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(pause);
         state.poll(&device).unwrap();
         assert_eq!(state.mono, 0);
 
         command
-            .set_button(BUTTON_MAIN_MUTE, true)
+            .set_button(Button::Mute, true)
             .send(&device)
             .unwrap();
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(pause);
         state.poll(&device).unwrap();
         assert_eq!(state.mute, 1);
         command
-            .set_button(BUTTON_MAIN_MUTE, false)
+            .set_button(Button::Mute, false)
             .send(&device)
             .unwrap();
         state.poll(&device).unwrap();
         assert_eq!(state.mute, 0);
 
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(pause);
         command
-            .set_button(BUTTON_PHANTOM_POWER, true)
+            .set_button(Button::Phantom, true)
             .send(&device)
             .unwrap();
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(pause);
         state.poll(&device).unwrap();
         assert_eq!(state.phantom, 1);
         command
-            .set_button(BUTTON_PHANTOM_POWER, false)
+            .set_button(Button::Phantom, false)
             .send(&device)
             .unwrap();
         state.poll(&device).unwrap();
