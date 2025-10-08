@@ -4,10 +4,11 @@ use nusb::{
 };
 use std::time::Duration;
 
-// Modes
-const MODE_BUTTON: u32 = 0x00;
-const MODE_CHANNEL_STRIP: u32 = 0x64;
-const MODE_BUS_STRIP: u32 = 0x65;
+enum Mode {
+    Button = 0x00,
+    ChannelStrip = 0x64,
+    BusStrip = 0x65,
+}
 
 enum Button {
     Line = 0x00,
@@ -29,13 +30,13 @@ pub struct Command {
     pub input_strip: u32,
     pub output_bus: u32,
     pub output_channel: u32,
-    value: u32,
+    pub value: u32,
 }
 
 impl Command {
     pub fn new() -> Self {
         Command {
-            mode: MODE_CHANNEL_STRIP,
+            mode: Mode::ChannelStrip as u32,
             input_strip: 0x00,
             output_bus: 0x04,
             output_channel: LEFT,
@@ -90,7 +91,7 @@ impl Command {
     pub fn set_button(&mut self, button: Button, value: bool) -> &Self {
         self.input_strip = 0x00;
         self.output_bus = 0x00;
-        self.mode = MODE_BUTTON;
+        self.mode = Mode::Button as u32;
         self.output_channel = button as u32;
         self.value = match value {
             true => 1,
