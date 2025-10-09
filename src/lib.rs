@@ -458,6 +458,8 @@ mod tests {
 
     #[test]
     fn fader() {
+        // This test needs a stable audio signal connected to Daw1
+        // Uniform white noise at -18dBFS should work.
         let device = open_device();
         let mut command = Command::new();
         let mut state = State::new();
@@ -476,11 +478,7 @@ mod tests {
 
         // Set Daw1 to unity gain
         command
-            .set_input_fader(18, 0, Channel::Left, CHANNEL_UNITY)
-            .send(&device)
-            .unwrap();
-        command
-            .set_input_fader(18, 0, Channel::Right, CHANNEL_UNITY)
+            .set_input_fader(18, 0, Channel::Left, db_to_gain(0.0))
             .send(&device)
             .unwrap();
         command
@@ -493,17 +491,72 @@ mod tests {
         let mut sum_out = 0.0;
         let mut sum_in = 0.0;
 
-        for _ in 0..samples {
+        for s in 1..=samples * 6 {
             thread::sleep(pause);
             state.poll(&device).unwrap();
-            sum_out += State::get_db(state.bus[0]);
-            sum_out += State::get_db(state.bus[1]);
-            sum_in += State::get_db(state.daw[0]);
-            sum_in += State::get_db(state.daw[1]);
+            if s > samples * 2 && s <= samples * 3 {
+                sum_out += State::get_db(state.bus[0]);
+                sum_in += State::get_db(state.daw[0]);
+            }
         }
-        let average_out = sum_out / (samples * 2) as f64;
-        let average_in = sum_in / (samples * 2) as f64;
+        let average_out = sum_out / samples as f64;
+        let average_in = sum_in / samples as f64;
         println!("in:  {average_in}");
         println!("out: {average_out}");
+        assert!((average_in - average_out).abs() < 0.01);
+
+        let mut attenuation = -12.0;
+        command
+            .set_input_fader(18, 0, Channel::Left, db_to_gain(attenuation))
+            .send(&device)
+            .unwrap();
+        command
+            .set_output_fader(0, db_to_gain(0.0))
+            .send(&device)
+            .unwrap();
+        let mut sum_out = 0.0;
+        let mut sum_in = 0.0;
+
+        state.poll(&device).unwrap();
+        for s in 1..=samples * 6 {
+            thread::sleep(pause);
+            state.poll(&device).unwrap();
+            if s > samples * 2 && s <= samples * 3 {
+                sum_out += State::get_db(state.bus[0]);
+                sum_in += State::get_db(state.daw[0]);
+            }
+        }
+        let average_out = sum_out / samples as f64;
+        let average_in = sum_in / samples as f64;
+        println!("in:  {average_in}");
+        println!("out: {average_out}");
+        assert!((average_in + attenuation - average_out).abs() < 0.01);
+
+        attenuation = -6.0;
+        command
+            .set_input_fader(18, 0, Channel::Left, db_to_gain(0.0))
+            .send(&device)
+            .unwrap();
+        command
+            .set_output_fader(0, db_to_gain(attenuation))
+            .send(&device)
+            .unwrap();
+        let mut sum_out = 0.0;
+        let mut sum_in = 0.0;
+
+        state.poll(&device).unwrap();
+        for s in 1..=samples * 6 {
+            thread::sleep(pause);
+            state.poll(&device).unwrap();
+            if s > samples * 2 && s <= samples * 3 {
+                sum_out += State::get_db(state.bus[0]);
+                sum_in += State::get_db(state.daw[0]);
+            }
+        }
+        let average_out = sum_out / samples as f64;
+        let average_in = sum_in / samples as f64;
+        println!("in:  {average_in}");
+        println!("out: {average_out}");
+        assert!((average_in + attenuation - average_out).abs() < 0.01);
     }
 }
