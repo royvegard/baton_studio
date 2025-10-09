@@ -476,87 +476,41 @@ mod tests {
                 .unwrap();
         }
 
-        // Set Daw1 to unity gain
-        command
-            .set_input_fader(18, 0, Channel::Left, db_to_gain(0.0))
-            .send(&device)
-            .unwrap();
-        command
-            .set_output_fader(0, db_to_gain(0.0))
-            .send(&device)
-            .unwrap();
-
-        let pause = Duration::from_millis(123);
         let samples = 10;
-        let mut sum_out = 0.0;
-        let mut sum_in = 0.0;
+        let pause = Duration::from_millis(123);
 
-        for s in 1..=samples * 6 {
-            thread::sleep(pause);
+        let mut test_procedure = |attenuation_in, attenuation_out| {
+            command
+                .set_input_fader(18, 0, Channel::Left, db_to_gain(attenuation_in))
+                .send(&device)
+                .unwrap();
+            command
+                .set_output_fader(0, db_to_gain(attenuation_out))
+                .send(&device)
+                .unwrap();
+            let mut sum_out = 0.0;
+            let mut sum_in = 0.0;
+
             state.poll(&device).unwrap();
-            if s > samples * 2 && s <= samples * 3 {
-                sum_out += State::get_db(state.bus[0]);
-                sum_in += State::get_db(state.daw[0]);
+            for s in 1..=samples * 6 {
+                thread::sleep(pause);
+                state.poll(&device).unwrap();
+                if s > samples * 2 && s <= samples * 3 {
+                    sum_out += State::get_db(state.bus[0]);
+                    sum_in += State::get_db(state.daw[0]);
+                }
             }
-        }
-        let average_out = sum_out / samples as f64;
-        let average_in = sum_in / samples as f64;
-        println!("in:  {average_in}");
-        println!("out: {average_out}");
-        assert!((average_in - average_out).abs() < 0.01);
+            let average_out = sum_out / samples as f64;
+            let average_in = sum_in / samples as f64;
+            println!("in:  {average_in}");
+            println!("out: {average_out}");
+            assert!((average_in + attenuation_in - average_out + attenuation_out).abs() < 0.01);
+        };
 
-        let mut attenuation = -12.0;
-        command
-            .set_input_fader(18, 0, Channel::Left, db_to_gain(attenuation))
-            .send(&device)
-            .unwrap();
-        command
-            .set_output_fader(0, db_to_gain(0.0))
-            .send(&device)
-            .unwrap();
-        let mut sum_out = 0.0;
-        let mut sum_in = 0.0;
-
-        state.poll(&device).unwrap();
-        for s in 1..=samples * 6 {
-            thread::sleep(pause);
-            state.poll(&device).unwrap();
-            if s > samples * 2 && s <= samples * 3 {
-                sum_out += State::get_db(state.bus[0]);
-                sum_in += State::get_db(state.daw[0]);
-            }
-        }
-        let average_out = sum_out / samples as f64;
-        let average_in = sum_in / samples as f64;
-        println!("in:  {average_in}");
-        println!("out: {average_out}");
-        assert!((average_in + attenuation - average_out).abs() < 0.01);
-
-        attenuation = -6.0;
-        command
-            .set_input_fader(18, 0, Channel::Left, db_to_gain(0.0))
-            .send(&device)
-            .unwrap();
-        command
-            .set_output_fader(0, db_to_gain(attenuation))
-            .send(&device)
-            .unwrap();
-        let mut sum_out = 0.0;
-        let mut sum_in = 0.0;
-
-        state.poll(&device).unwrap();
-        for s in 1..=samples * 6 {
-            thread::sleep(pause);
-            state.poll(&device).unwrap();
-            if s > samples * 2 && s <= samples * 3 {
-                sum_out += State::get_db(state.bus[0]);
-                sum_in += State::get_db(state.daw[0]);
-            }
-        }
-        let average_out = sum_out / samples as f64;
-        let average_in = sum_in / samples as f64;
-        println!("in:  {average_in}");
-        println!("out: {average_out}");
-        assert!((average_in + attenuation - average_out).abs() < 0.01);
+        test_procedure(-32.144, -30.8843);
+        test_procedure(0.0, 0.0);
+        test_procedure(-12.0, 0.0);
+        test_procedure(0.0, -6.0);
+        test_procedure(-6.144, -7.8843);
     }
 }
