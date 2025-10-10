@@ -39,8 +39,15 @@ pub struct Command {
     pub value: u32,
 }
 
+/// Convert from db to integer gain
 pub fn db_to_gain(db: f64) -> u32 {
     (CHANNEL_UNITY as f64 * 10.0_f64.powf(db.clamp(-120.0, 10.0) / 20.0)) as u32
+}
+
+/// Convert from integer gain to db
+pub fn gain_to_db(input: u32) -> f64 {
+    const ZERO_DBFS: u32 = 0x8000_0000;
+    20.0 * (input as f64 / ZERO_DBFS as f64).log10()
 }
 
 impl Command {
@@ -148,14 +155,13 @@ impl Command {
             data: &self.as_array(),
         };
 
-        //block_on(device.control_out(fader_control)).into_result()
         device
             .control_out(fader_control, Duration::from_millis(100))
             .wait()
     }
 }
 
-pub struct State {
+struct State {
     counter: u16,
     /// Microphone input meters.
     mic: [u32; 8],
@@ -326,12 +332,6 @@ impl State {
         self.mono = slice[0xf4] as u32;
     }
 
-    /// Convert from integer amplitude to db amplitude.
-    fn get_db(input: u32) -> f64 {
-        const ZERO_DBFS: u32 = 0x8000_0000;
-        20.0 * (input as f64 / ZERO_DBFS as f64).log10()
-    }
-
     fn poll(&mut self, device: &Device) -> Result<(), TransferError> {
         self.reset();
 
@@ -496,8 +496,8 @@ mod tests {
                 thread::sleep(pause);
                 state.poll(&device).unwrap();
                 if s > samples * 2 && s <= samples * 3 {
-                    sum_out += State::get_db(state.bus[0]);
-                    sum_in += State::get_db(state.daw[0]);
+                    sum_out += gain_to_db(state.bus[0]);
+                    sum_in += gain_to_db(state.daw[0]);
                 }
             }
             let average_out = sum_out / samples as f64;
