@@ -4,31 +4,37 @@ use nusb::{
 };
 use std::time::Duration;
 
-#[derive(Clone, Copy)]
-pub enum Mode {
-    Button = 0x00,
-    ChannelStrip = 0x64,
-    BusStrip = 0x65,
-}
+// Fader presets
+const MUTED: u32 = 0x00;
+const CHANNEL_UNITY: u32 = 0x0100_0000;
 
+/// Push buttons on the front panel of the Studio 1824c.
 #[derive(Clone, Copy)]
 pub enum Button {
+    /// Switches between instrument- and line-level on
+    /// the 1/4-inch inputs for channel 1 and 2.
     Line = 0x00,
+    /// Mutes the Main output signal.
     Mute = 0x01,
+    /// Sums the Main stereo output signal to mono.
     Mono = 0x02,
+    /// 48V phantom power for all microphone inputs.
     Phantom = 0x04,
 }
 
-// Output channels
+/// Output channels
 #[derive(Clone, Copy)]
 pub enum Channel {
     Left = 0x00,
     Right = 0x01,
 }
 
-// Fader presets
-const MUTED: u32 = 0x00;
-const CHANNEL_UNITY: u32 = 0x0100_0000;
+#[derive(Clone, Copy)]
+enum Mode {
+    Button = 0x00,
+    ChannelStrip = 0x64,
+    BusStrip = 0x65,
+}
 
 pub struct Command {
     pub mode: Mode,
@@ -37,17 +43,6 @@ pub struct Command {
     pub output_channel: Channel,
     pub button: Button,
     pub value: u32,
-}
-
-/// Convert from db to integer gain
-pub fn db_to_gain(db: f64) -> u32 {
-    (CHANNEL_UNITY as f64 * 10.0_f64.powf(db.clamp(-120.0, 10.0) / 20.0)) as u32
-}
-
-/// Convert from integer gain to db
-pub fn gain_to_db(input: u32) -> f64 {
-    const ZERO_DBFS: u32 = 0x8000_0000;
-    20.0 * (input as f64 / ZERO_DBFS as f64).log10()
 }
 
 impl Command {
@@ -369,6 +364,17 @@ impl State {
         );
         Ok(())
     }
+}
+
+/// Convert from db to integer gain
+pub fn db_to_gain(db: f64) -> u32 {
+    (CHANNEL_UNITY as f64 * 10.0_f64.powf(db.clamp(-120.0, 10.0) / 20.0)) as u32
+}
+
+/// Convert from integer gain to db
+pub fn gain_to_db(input: u32) -> f64 {
+    const ZERO_DBFS: u32 = 0x8000_0000;
+    20.0 * (input as f64 / ZERO_DBFS as f64).log10()
 }
 
 #[cfg(test)]
