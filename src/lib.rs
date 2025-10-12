@@ -45,6 +45,12 @@ pub struct Command {
     value: u32,
 }
 
+impl Default for Command {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Command {
     pub fn new() -> Self {
         Command {
@@ -176,6 +182,12 @@ pub struct State {
     pub mute: u32,
     /// Main mix mono.
     pub mono: u32,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl State {
