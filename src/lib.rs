@@ -1,3 +1,5 @@
+#![warn(missing_docs)]
+//! Talk to your Presonus STUDIO1824c
 use nusb::{
     Device, MaybeFuture,
     transfer::{ControlIn, ControlOut, ControlType, Recipient, TransferError},
@@ -36,6 +38,43 @@ enum Mode {
     BusStrip = 0x65,
 }
 
+/// Commands to send to the audio device.
+///
+/// Command is used to prepare and send commands to the
+/// Presonus STUDIO1824c. A Command can be prepared to
+/// set the buttons on the front panel, or to set the
+/// faders.
+///
+/// # Examples
+/// ```
+/// # use std::error::Error;
+/// use baton_lib::{Button, Channel,Command};
+/// use nusb::MaybeFuture;
+///
+/// # fn main() -> Result<(), Box<dyn Error>> {
+/// // Open the 1824c usb device.
+/// let my_1824c = nusb::list_devices()
+///    .wait()?
+///    .find(|dev| dev.vendor_id() == 0x194f && dev.product_id() == 0x010d)
+///    .ok_or(std::io::Error::new(std::io::ErrorKind::NotFound, "device not found"))?
+///    .open()
+///    .wait()?;
+///
+/// let mut command = Command::new();
+///
+/// // Prepare command to set the Mute button to true.
+/// command.set_button(Button::Mute, true);
+/// // Send the command.
+/// command.send(&my_1824c)?;
+///
+/// // Prepare and send command to set fader.
+/// command
+///     .set_input_fader(0, 0, Channel::Left, 0x0100_0000)
+///     .send(&my_1824c)?;
+///
+/// # Ok(())
+/// # }
+/// ```
 pub struct Command {
     mode: Mode,
     input_strip: u32,
@@ -56,7 +95,7 @@ impl Command {
         Command {
             mode: Mode::ChannelStrip,
             input_strip: 0x00,
-            output_bus: 0x04,
+            output_bus: 0x00,
             output_channel: Channel::Left,
             button: Button::Line,
             value: 0x00000000,
@@ -112,6 +151,27 @@ impl Command {
         arr
     }
 
+    /// Prepare a Button command.
+    ///
+    /// Used to turn on or off one of the four buttons
+    /// on the front panel of the 1824c.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::error::Error;
+    /// # use baton_lib::{Button, Channel,Command};
+    /// # use nusb::MaybeFuture;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # let my_1824c = nusb::list_devices()
+    /// #    .wait()?.find(|dev| dev.vendor_id() == 0x194f && dev.product_id() == 0x010d)
+    /// #    .ok_or(std::io::Error::new(std::io::ErrorKind::NotFound, "device not found"))?
+    /// #    .open().wait()?;
+    /// # let mut command = Command::new();
+    /// // Prepare and send command to turn off phantom power.
+    /// command.set_button(Button::Phantom, false).send(&my_1824c)?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn set_button(&mut self, button: Button, value: bool) -> &mut Self {
         self.input_strip = 0x00;
         self.output_bus = 0x00;
@@ -124,6 +184,26 @@ impl Command {
         self
     }
 
+    /// Prepare a command to set an input fader.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::error::Error;
+    /// # use baton_lib::{Button, Channel,Command};
+    /// # use nusb::MaybeFuture;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # let my_1824c = nusb::list_devices()
+    /// #    .wait()?.find(|dev| dev.vendor_id() == 0x194f && dev.product_id() == 0x010d)
+    /// #    .ok_or(std::io::Error::new(std::io::ErrorKind::NotFound, "device not found"))?
+    /// #    .open().wait()?;
+    /// # let mut command = Command::new();
+    /// // Prepare and send command to set the fader of the first
+    /// // input channel of the left channel of the first stereo
+    /// // mix to unity gain.
+    /// command.set_input_fader(0, 0, Channel::Left, 0x0100_0000).send(&my_1824c)?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn set_input_fader(
         &mut self,
         input: u32,
@@ -139,6 +219,7 @@ impl Command {
         self
     }
 
+    /// Prepare a command to set an output fader.
     pub fn set_output_fader(&mut self, output: u32, value: u32) -> &mut Self {
         self.mode = Mode::BusStrip;
         self.output_bus = output;
@@ -206,8 +287,8 @@ impl State {
         }
     }
 
-    /// Reset all values to zero.
-    /// This is used before requesting state from device.
+    // Reset all values to zero.
+    // This is used before requesting state from device.
     fn reset(&mut self) {
         self.mic = [0x00; 8];
         self.spdif = [0x00; 2];
