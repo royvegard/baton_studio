@@ -5,8 +5,8 @@ use nusb::{
 use std::time::Duration;
 
 // Fader presets
-const MUTED: u32 = 0x00;
-const CHANNEL_UNITY: u32 = 0x0100_0000;
+pub const MUTED: u32 = 0x00;
+pub const CHANNEL_UNITY: u32 = 0x0100_0000;
 
 /// Push buttons on the front panel of the Studio 1824c.
 #[derive(Clone, Copy)]
@@ -37,12 +37,12 @@ enum Mode {
 }
 
 pub struct Command {
-    pub mode: Mode,
-    pub input_strip: u32,
-    pub output_bus: u32,
-    pub output_channel: Channel,
-    pub button: Button,
-    pub value: u32,
+    mode: Mode,
+    input_strip: u32,
+    output_bus: u32,
+    output_channel: Channel,
+    button: Button,
+    value: u32,
 }
 
 impl Command {
@@ -156,30 +156,30 @@ impl Command {
     }
 }
 
-struct State {
+pub struct State {
     counter: u16,
     /// Microphone input meters.
-    mic: [u32; 8],
+    pub mic: [u32; 8],
     /// S/PDIF input meters.
-    spdif: [u32; 2],
+    pub spdif: [u32; 2],
     /// ADAT input meters.
-    adat: [u32; 8],
+    pub adat: [u32; 8],
     /// DAW input meters.
-    daw: [u32; 18],
+    pub daw: [u32; 18],
     /// Stereo busses meters.
-    bus: [u32; 18],
+    pub bus: [u32; 18],
     /// 48V phantom power.
-    phantom: u32,
+    pub phantom: u32,
     /// Channel 1-2 line mode.
-    line: u32,
+    pub line: u32,
     /// Main mix mute.
-    mute: u32,
+    pub mute: u32,
     /// Main mix mono.
-    mono: u32,
+    pub mono: u32,
 }
 
 impl State {
-    fn new() -> Self {
+    pub fn new() -> Self {
         State {
             counter: 0x01,
             mic: [0x00; 8],
@@ -327,7 +327,7 @@ impl State {
         self.mono = slice[0xf4] as u32;
     }
 
-    fn poll(&mut self, device: &Device) -> Result<(), TransferError> {
+    pub fn poll(&mut self, device: &Device) -> Result<(), TransferError> {
         self.reset();
 
         let control: ControlOut = ControlOut {
