@@ -1,5 +1,77 @@
 #![warn(missing_docs)]
 //! Talk to your Presonus STUDIO1824c
+//!
+//! This library allows you to control most of the functions
+//! of the 1824c audio interface.
+//!
+//! The Presonus STUDIO1824c is a USB audio interface that features
+//! - 18 input channels:
+//!   - 8 analog input channels with mic/line/instr preamps
+//!   - 2 didgital S/PDIF input channels
+//!   - 8 digital ADAT input channels
+//! - 18 DAW channels i.e. channels that appear as output channels from the point of view of the computer
+//! - 24 output channels:
+//!   - 8 analog line output channels
+//!   - 2 stereo headphone outputs (total 4 channels)
+//!   - 2 Main output channels
+//!   - 2 digital S/PDIF output channels
+//!   - 8 digital ADAT output channels
+//! - Button for 48V phantom power for the 8 mic input channels
+//! - Button for Main output mute
+//! - Button for Main output mono
+//! - Button to switch between instrument- and line-level on the 1/4 inch inputs on channel 1 and 2
+//!
+//! ## Mixer
+//! The internals of the 1824c contains 9 separate mixes.
+//! One mix contains fader and balance controls for all 18 input channels plus all 18 DAW channels for a total of 36 channels.
+//! The output for mix number **one** is output channels 1 and 2, and at the same time Main output channels 1 and 2, and stereo headphone output number 1.
+//! The output for mix number two is output channels 3 and 4, and also stereo headphone output number 2.
+//! The output for mix number three is output channels 5 and 6.
+//! Mix four is output channels 7 and 8.
+//! Mix five is the 2 digital S/PDIF output channels.
+//! Mix six through nine is the ADAT digital output channels (six -> ADAT 1,2, seven -> ADAT 3,4, etc.)
+//!
+//! Think of it as a mixer with 36 input channels and 9 buses.
+//!
+//! ## Signal flow
+//! A signal flow from one input channel to all nine buses looks something like this:
+//! ```text
+//!           +-->Fader left--->\                /-->Line Output 1
+//! Input 1-->|                  |Stereo fader 1|
+//!           +-->Fader right-->/                \-->Line Output 2
+//!           |
+//!          ...
+//!           |
+//!           +-->Fader left--->\                /-->Line Output 7
+//!           |                  |Stereo fader 4|
+//!           +-->Fader right-->/                \-->Line Output 8
+//!           |
+//!           |
+//!           +-->Fader left--->\                /-->S/PDIF Output left
+//!           |                  |Stereo fader 5|
+//!           +-->Fader right-->/                \-->S/PDIF Output right
+//!           |
+//!           |
+//!           +-->Fader left--->\                /-->ADAT Output 1
+//!           |                  |Stereo fader 6|
+//!           +-->Fader right-->/                \-->ADAT Output 2
+//!           |
+//!          ...
+//!           |
+//!           +-->Fader left--->\                /-->ADAT Output 7
+//!           |                  |Stereo fader 9|
+//!           +-->Fader right-->/                \-->ADAT Output 8
+//! ```
+//! The signal flow is identical for all of the 36 input channels.
+//! With this library you can control all of the Fader left and Fader right faders, and all of the Stereo faders.
+//! In total you can control 36*2=72 left/right Faders and 9 Stereo faders.
+//!
+//! The Fader left and Fader right, or input faders are controlled with [`set_input_fader()`](Command::set_input_fader).
+//! The Stereo faders, or output faders are controlled with [`set_output_fader()`](Command::set_output_fader).
+//!
+//! ## Buttons
+//! The four buttons on the front panel of the audio interface can be controlled with [`set_button()`](Command::set_button).
+//!
 use nusb::{
     Device, MaybeFuture,
     transfer::{ControlIn, ControlOut, ControlType, Recipient, TransferError},
@@ -7,8 +79,10 @@ use nusb::{
 use std::time::Duration;
 
 // Fader presets
+/// A fader gain value that corresponds to muted.
 pub const MUTED: u32 = 0x00;
-pub const CHANNEL_UNITY: u32 = 0x0100_0000;
+/// A fader gain value that corresponds to unity gain.
+pub const UNITY: u32 = 0x0100_0000;
 
 /// Push buttons on the front panel of the Studio 1824c.
 #[derive(Clone, Copy)]
@@ -186,6 +260,10 @@ impl Command {
 
     /// Prepare a command to set an input fader.
     ///
+    /// The input faders are the faders of the
+    ///
+    /// # Arguments
+    ///
     /// # Examples
     /// ```
     /// # use std::error::Error;
@@ -212,8 +290,8 @@ impl Command {
         value: u32,
     ) -> &mut Self {
         self.mode = Mode::ChannelStrip;
-        self.input_strip = input;
-        self.output_bus = output;
+        self.input_strip = input.clamp(0, 35);
+        self.output_bus = output.clamp(0, 8);
         self.output_channel = channel;
         self.value = value;
         self
@@ -222,7 +300,7 @@ impl Command {
     /// Prepare a command to set an output fader.
     pub fn set_output_fader(&mut self, output: u32, value: u32) -> &mut Self {
         self.mode = Mode::BusStrip;
-        self.output_bus = output;
+        self.output_bus = output.clamp(0, 8);
         self.value = value;
         self
     }
@@ -459,12 +537,12 @@ impl State {
     }
 }
 
-/// Convert from db to integer gain
+/// Convert from dB to integer gain
 pub fn db_to_gain(db: f64) -> u32 {
-    (CHANNEL_UNITY as f64 * 10.0_f64.powf(db.clamp(-120.0, 10.0) / 20.0)) as u32
+    (UNITY as f64 * 10.0_f64.powf(db.clamp(-120.0, 10.0) / 20.0)) as u32
 }
 
-/// Convert from integer gain to db
+/// Convert from integer gain to dB
 pub fn gain_to_db(input: u32) -> f64 {
     const ZERO_DBFS: u32 = 0x8000_0000;
     20.0 * (input as f64 / ZERO_DBFS as f64).log10()
