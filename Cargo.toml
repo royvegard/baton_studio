@@ -1,5 +1,5 @@
 [package]
-name = "baton_lib"
+name = "baton-studio"
 version = "0.1.0"
 edition = "2024"
 
