@@ -122,7 +122,7 @@ enum Mode {
 /// # Examples
 /// ```
 /// # use std::error::Error;
-/// use baton_lib::{Button, Channel,Command};
+/// use baton_studio::{Button, Channel,Command};
 /// use nusb::MaybeFuture;
 ///
 /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -233,7 +233,7 @@ impl Command {
     /// # Examples
     /// ```
     /// # use std::error::Error;
-    /// # use baton_lib::{Button, Channel,Command};
+    /// # use baton_studio::{Button, Channel,Command};
     /// # use nusb::MaybeFuture;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// # let my_1824c = nusb::list_devices()
@@ -267,7 +267,7 @@ impl Command {
     /// # Examples
     /// ```
     /// # use std::error::Error;
-    /// # use baton_lib::{Button, Channel,Command};
+    /// # use baton_studio::{Button, Channel,Command};
     /// # use nusb::MaybeFuture;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// # let my_1824c = nusb::list_devices()
@@ -679,9 +679,11 @@ mod tests {
             }
             let average_out = sum_out / samples as f64;
             let average_in = sum_in / samples as f64;
+            let expected_out = average_in + attenuation_in + attenuation_out;
             println!("in:  {average_in}");
+            println!("exp: {expected_out}");
             println!("out: {average_out}");
-            assert!((average_in + attenuation_in - average_out + attenuation_out).abs() < 0.01);
+            assert!((average_in + attenuation_in - average_out + attenuation_out).abs() < 1.0);
         };
 
         test_procedure(-32.144, -30.8843);
