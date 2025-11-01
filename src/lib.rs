@@ -110,6 +110,18 @@ pub enum Value {
     Muted,
 }
 
+impl Value {
+    /// Convert Value to gain u32
+    fn to_gain(&self) -> u32 {
+        match self {
+            Value::DB(db) => db_to_gain(*db),
+            Value::Gain(g) => *g,
+            Value::Unity => UNITY,
+            Value::Muted => MUTED,
+        }
+    }
+}
+
 /// Output channels
 #[derive(Clone, Copy)]
 pub enum Channel {
@@ -316,34 +328,23 @@ impl Command {
         channel: Channel,
         value: Value,
     ) -> &mut Self {
-        let v = match value {
-            Value::DB(db) => db_to_gain(db),
-            Value::Gain(g) => g,
-            Value::Unity => UNITY,
-            Value::Muted => MUTED,
-        };
         self.mode = Mode::ChannelStrip;
         self.input_strip = input.clamp(0, 35);
         self.output_bus = output.clamp(0, 8);
         self.output_channel = channel;
-        self.value = v;
+        self.value = value.to_gain();
         self
     }
 
     /// Prepare a command to set an output fader.
     pub fn set_output_fader(&mut self, output: u32, value: Value) -> &mut Self {
-        let v = match value {
-            Value::DB(db) => db_to_gain(db),
-            Value::Gain(g) => g,
-            Value::Unity => UNITY,
-            Value::Muted => MUTED,
-        };
         self.mode = Mode::BusStrip;
         self.output_bus = output.clamp(0, 8);
-        self.value = v;
+        self.value = value.to_gain();
         self
     }
 
+    /// Send the prepared command to the device.
     pub fn send(&self, device: &Device) -> Result<(), TransferError> {
         let fader_control: ControlOut = ControlOut {
             control_type: ControlType::Vendor,
@@ -360,6 +361,7 @@ impl Command {
     }
 }
 
+/// State of the Presonus STUDIO1824c audio interface.
 pub struct State {
     counter: u16,
     /// Microphone input meters.
@@ -389,6 +391,7 @@ impl Default for State {
 }
 
 impl State {
+    /// Initialize the State struct.
     pub fn new() -> Self {
         State {
             counter: 0x01,
@@ -698,6 +701,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn fader() {
         // This test needs a stable audio signal connected to Daw1
         // Uniform white noise at -18dBFS should work.
