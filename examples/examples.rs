@@ -1,7 +1,6 @@
-use std::error::Error;
-
 use baton_studio::*;
 use nusb::MaybeFuture;
+use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let device = nusb::list_devices()
