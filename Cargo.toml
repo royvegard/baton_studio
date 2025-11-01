@@ -1,5 +1,6 @@
 [package]
 name = "baton-studio"
+description = "Rust library for controlling the PreSonus STUDIO1824c audio interface via USB."
 version = "0.1.0"
 edition = "2024"
 authors = ["Roy Vegard Ovesen <roy.vegard.ovesen@gmail.com>"]
