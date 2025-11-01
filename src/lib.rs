@@ -80,9 +80,9 @@ use std::time::Duration;
 
 // Fader presets
 /// A fader gain value that corresponds to muted.
-pub const MUTED: u32 = 0x00;
+const MUTED: u32 = 0x00;
 /// A fader gain value that corresponds to unity gain.
-pub const UNITY: u32 = 0x0100_0000;
+const UNITY: u32 = 0x0100_0000;
 
 /// Push buttons on the front panel of the Studio 1824c.
 #[derive(Clone, Copy)]
@@ -96,6 +96,18 @@ pub enum Button {
     Mono = 0x02,
     /// 48V phantom power for all microphone inputs.
     Phantom = 0x04,
+}
+
+/// Value for faders
+pub enum Value {
+    /// Decibel
+    DB(f64),
+    /// Raw gain value
+    Gain(u32),
+    /// Unity gain
+    Unity,
+    /// Zero gain or muted
+    Muted,
 }
 
 /// Output channels
@@ -124,7 +136,7 @@ enum Mode {
 /// # Examples
 /// ```
 /// # use std::error::Error;
-/// use baton_studio::{Button, Channel,Command};
+/// use baton_studio::{Button, Channel, Command, Value};
 /// use nusb::MaybeFuture;
 ///
 /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -145,7 +157,7 @@ enum Mode {
 ///
 /// // Prepare and send command to set fader.
 /// command
-///     .set_input_fader(0, 0, Channel::Left, 0x0100_0000)
+///     .set_input_fader(0, 0, Channel::Left, Value::Unity)
 ///     .send(&my_1824c)?;
 ///
 /// # Ok(())
@@ -236,7 +248,7 @@ impl Command {
     /// # Examples
     /// ```
     /// # use std::error::Error;
-    /// # use baton_studio::{Button, Channel,Command};
+    /// # use baton_studio::*;
     /// # use nusb::MaybeFuture;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// # let my_1824c = nusb::list_devices()
@@ -287,13 +299,13 @@ impl Command {
     /// // Prepare and send command to set the fader of the first
     /// // input channel of the left channel of the first stereo
     /// // mix to unity gain.
-    /// command.set_input_fader(0, 0, Channel::Left, UNITY).send(&my_1824c)?;
+    /// command.set_input_fader(0, 0, Channel::Left, Value::Unity).send(&my_1824c)?;
     ///
     /// // Set value to zero i.e. muted.
-    /// command.set_input_fader(0, 0, Channel::Left, MUTED).send(&my_1824c)?;
+    /// command.set_input_fader(0, 0, Channel::Left, Value::Muted).send(&my_1824c)?;
     ///
     /// // Use the helper function db_to_gain()
-    /// command.set_input_fader(0, 0, Channel::Left, db_to_gain(-6.0)).send(&my_1824c)?;
+    /// command.set_input_fader(0, 0, Channel::Left, Value::DB(-6.0)).send(&my_1824c)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -302,21 +314,33 @@ impl Command {
         input: u32,
         output: u32,
         channel: Channel,
-        value: u32,
+        value: Value,
     ) -> &mut Self {
+        let v = match value {
+            Value::DB(db) => db_to_gain(db),
+            Value::Gain(g) => g,
+            Value::Unity => UNITY,
+            Value::Muted => MUTED,
+        };
         self.mode = Mode::ChannelStrip;
         self.input_strip = input.clamp(0, 35);
         self.output_bus = output.clamp(0, 8);
         self.output_channel = channel;
-        self.value = value;
+        self.value = v;
         self
     }
 
     /// Prepare a command to set an output fader.
-    pub fn set_output_fader(&mut self, output: u32, value: u32) -> &mut Self {
+    pub fn set_output_fader(&mut self, output: u32, value: Value) -> &mut Self {
+        let v = match value {
+            Value::DB(db) => db_to_gain(db),
+            Value::Gain(g) => g,
+            Value::Unity => UNITY,
+            Value::Muted => MUTED,
+        };
         self.mode = Mode::BusStrip;
         self.output_bus = output.clamp(0, 8);
-        self.value = value;
+        self.value = v;
         self
     }
 
@@ -684,11 +708,11 @@ mod tests {
         // Mute all inputs
         for c in 0..36 {
             command
-                .set_input_fader(c, 0, Channel::Left, 0)
+                .set_input_fader(c, 0, Channel::Left, Value::Muted)
                 .send(&device)
                 .unwrap();
             command
-                .set_input_fader(c, 0, Channel::Right, 0)
+                .set_input_fader(c, 0, Channel::Right, Value::Muted)
                 .send(&device)
                 .unwrap();
         }
@@ -698,11 +722,11 @@ mod tests {
 
         let mut test_procedure = |attenuation_in, attenuation_out| {
             command
-                .set_input_fader(18, 0, Channel::Left, db_to_gain(attenuation_in))
+                .set_input_fader(18, 0, Channel::Left, Value::DB(attenuation_in))
                 .send(&device)
                 .unwrap();
             command
-                .set_output_fader(0, db_to_gain(attenuation_out))
+                .set_output_fader(0, Value::DB(attenuation_out))
                 .send(&device)
                 .unwrap();
             let mut sum_out = 0.0;

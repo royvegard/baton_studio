@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use baton_studio::{Button, Channel, Command, MUTED, State, UNITY, db_to_gain, gain_to_db};
+use baton_studio::{Button, Channel, Command, State, Value, gain_to_db};
 use nusb::MaybeFuture;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -23,18 +23,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     command.set_button(Button::Phantom, true).send(&device)?;
 
     command
-        .set_input_fader(0, 0, Channel::Left, db_to_gain(-3.0))
+        .set_input_fader(0, 0, Channel::Left, Value::DB(-3.0))
         .send(&device)?;
 
     command
-        .set_input_fader(0, 0, Channel::Left, UNITY)
+        .set_input_fader(0, 0, Channel::Left, Value::Unity)
         .send(&device)?;
+
+    command.set_output_fader(0, Value::DB(-2.4)).send(&device)?;
 
     command
-        .set_output_fader(0, db_to_gain(-2.4))
-        .send(&device)?;
-
-    command.set_output_fader(1, MUTED).send(&device).unwrap();
+        .set_output_fader(1, Value::Muted)
+        .send(&device)
+        .unwrap();
 
     state.poll(&device)?;
 
