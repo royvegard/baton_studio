@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use baton_studio::{Button, Channel, Command, State, Value, gain_to_db};
+use baton_studio::*;
 use nusb::MaybeFuture;
 
 fn main() -> Result<(), Box<dyn Error>> {
