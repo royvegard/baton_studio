@@ -23,8 +23,8 @@
 //!
 //! ## Mixer
 //! The internals of the 1824c contains 9 separate mixes.
-//! One mix contains fader and balance controls for all 18 input channels plus all 18 DAW channels for a total of 36 channels.
-//! The output for mix number **one** is output channels 1 and 2, and at the same time Main output channels 1 and 2, and stereo headphone output number 1.
+//! One mix contains stereo fader controls for all 18 input channels plus all 18 DAW channels for a total of 36 channels.
+//! The output for mix number one is output channels 1 and 2, and at the same time Main output channels 1 and 2, and stereo headphone output number 1.
 //! The output for mix number two is output channels 3 and 4, and also stereo headphone output number 2.
 //! The output for mix number three is output channels 5 and 6.
 //! Mix four is output channels 7 and 8.
@@ -101,7 +101,9 @@ pub enum Button {
 /// Output channels
 #[derive(Clone, Copy)]
 pub enum Channel {
+    /// Left channel
     Left = 0x00,
+    /// Right channel
     Right = 0x01,
 }
 
@@ -165,6 +167,7 @@ impl Default for Command {
 }
 
 impl Command {
+    /// Initialize the Command struct.
     pub fn new() -> Self {
         Command {
             mode: Mode::ChannelStrip,
@@ -260,14 +263,20 @@ impl Command {
 
     /// Prepare a command to set an input fader.
     ///
-    /// The input faders are the faders of the
+    /// The input faders are the faders of the 36
     ///
     /// # Arguments
+    /// - `input` The input channel is a number between 0 and 35.
+    /// - `output` The ouput bus is a number between 0 and 8.
+    /// - `channel` The channel of the output bus.
+    ///   [`Left`](Channel::Left) or [`Right`](Channel::Right).
+    /// - `value` The fader value.
+    ///   Use the helper function [`db_to_gain()`](db_to_gain) to easily set the value in db.
     ///
     /// # Examples
     /// ```
     /// # use std::error::Error;
-    /// # use baton_studio::{Button, Channel,Command};
+    /// # use baton_studio::*;
     /// # use nusb::MaybeFuture;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// # let my_1824c = nusb::list_devices()
@@ -278,7 +287,13 @@ impl Command {
     /// // Prepare and send command to set the fader of the first
     /// // input channel of the left channel of the first stereo
     /// // mix to unity gain.
-    /// command.set_input_fader(0, 0, Channel::Left, 0x0100_0000).send(&my_1824c)?;
+    /// command.set_input_fader(0, 0, Channel::Left, UNITY).send(&my_1824c)?;
+    ///
+    /// // Set value to zero i.e. muted.
+    /// command.set_input_fader(0, 0, Channel::Left, MUTED).send(&my_1824c)?;
+    ///
+    /// // Use the helper function db_to_gain()
+    /// command.set_input_fader(0, 0, Channel::Left, db_to_gain(-6.0)).send(&my_1824c)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -458,7 +473,7 @@ impl State {
         arr
     }
 
-    /// Convert a slice of 4 bytes to a u32.
+    // Convert a slice of 4 bytes to a u32.
     fn slice_to_u32(slice: &[u8]) -> u32 {
         let mut out: u32 = slice[0] as u32;
         out += slice[1] as u32 * 0x100;
@@ -498,6 +513,31 @@ impl State {
         self.mono = slice[0xf4] as u32;
     }
 
+    /// Read state from device
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::error::Error;
+    /// use baton_studio::{gain_to_db, State};
+    /// use nusb::MaybeFuture;
+    ///
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// // Open the 1824c usb device.
+    /// let my_1824c = nusb::list_devices()
+    ///    .wait()?
+    ///    .find(|dev| dev.vendor_id() == 0x194f && dev.product_id() == 0x010d)
+    ///    .ok_or(std::io::Error::new(std::io::ErrorKind::NotFound, "device not found"))?
+    ///    .open()
+    ///    .wait()?;
+    ///
+    /// let mut state = State::new();
+    /// state.poll(&my_1824c)?;
+    ///
+    /// let fader_value = gain_to_db(state.mic[0]);
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn poll(&mut self, device: &Device) -> Result<(), TransferError> {
         self.reset();
 
