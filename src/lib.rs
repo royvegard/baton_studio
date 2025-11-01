@@ -291,11 +291,10 @@ impl Command {
     ///
     /// # Arguments
     /// - `input` The input channel is a number between 0 and 35.
-    /// - `output` The ouput bus is a number between 0 and 8.
-    /// - `channel` The channel of the output bus.
+    /// - `output` The ouput stere bus is a number between 0 and 8.
+    /// - `channel` The channel of the output stere bus.
     ///   [`Left`](Channel::Left) or [`Right`](Channel::Right).
-    /// - `value` The fader value.
-    ///   Use the helper function [`db_to_gain()`](db_to_gain) to easily set the value in db.
+    /// - `value` The fader value. See [`Value`]enum for options.
     ///
     /// # Examples
     /// ```
@@ -374,13 +373,13 @@ pub struct State {
     pub daw: [u32; 18],
     /// Stereo busses meters.
     pub bus: [u32; 18],
-    /// 48V phantom power.
+    /// 48V phantom power button.
     pub phantom: u32,
-    /// Channel 1-2 line mode.
+    /// Channel 1-2 line mode button.
     pub line: u32,
-    /// Main mix mute.
+    /// Main mix mute button.
     pub mute: u32,
-    /// Main mix mono.
+    /// Main mix mono button.
     pub mono: u32,
 }
 
